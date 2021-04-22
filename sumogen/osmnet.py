@@ -1,12 +1,13 @@
-import os, base64
+import os, base64, sys
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 import subprocess
 
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
-    sys.path.append(tools)
-    print("set up sumolib env")
+    if tools not in sys.path:
+        sys.path.append(tools)
+        print("set up sumolib env")
 else:   
     sys.exit("please declare environment variable 'SUMO_HOME'")
 
