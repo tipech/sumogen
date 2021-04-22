@@ -1,10 +1,16 @@
-import os
+import os, base64
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
-
-import sumolib
 import subprocess
 
+if 'SUMO_HOME' in os.environ:
+    tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
+    sys.path.append(tools)
+    print("set up sumolib env")
+else:   
+    sys.exit("please declare environment variable 'SUMO_HOME'")
+
+import sumolib
 
 class OSMNet():
     """Connects to OpenStreetMap, downloads and converts specified network."""

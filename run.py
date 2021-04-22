@@ -2,6 +2,15 @@ import subprocess
 from sumogen.osmnet import OSMNet
 from sumogen.demandgen import DemandGenerator
 
+if 'SUMO_HOME' in os.environ:
+    tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
+    sys.path.append(tools)
+    print("set up sumolib env")
+else:   
+    sys.exit("please declare environment variable 'SUMO_HOME'")
+
+
+
 directory = 'sample'
 n = 500
 days = 10
