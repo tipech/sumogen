@@ -107,7 +107,7 @@ class OSMNet():
         netconvertOpts += ['--osm-files', osm_file]
         netconvertOpts += ['--output-file', net_file]
 
-        subprocess.call(netconvertOpts)
+        return subprocess.call(netconvertOpts)
 
 
     def get(self, north, south, west, east, net_file):
@@ -123,5 +123,7 @@ class OSMNet():
 
         tmp_file = "tmp.osm.xml"
         self.download(north, south, west, east, tmp_file)
-        self.convert(tmp_file, net_file)
+        success = self.convert(tmp_file, net_file)
         os.remove(tmp_file)
+
+        return success

@@ -7,8 +7,6 @@ from shutil import copyfile
 from itertools import combinations
 
 
-from pprint import pprint
-
 if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
     if tools not in sys.path:
@@ -22,6 +20,7 @@ duarouter = sumolib.checkBinary('duarouter')
 
 from .entities import Pedestrian, Trip
 from .plotting import ActivityPlot
+from ..sumo import SUMO
 
 
 def normpdf(x, mean, sd):
@@ -492,77 +491,102 @@ class DemandGenerator():
         routes_tree.write(routes_path)
 
 
+    def add_homes(self, output_path, pedestrians):
+        """Add pedestrians' initial home position in output trajectories.
 
-    def make_sumo_config(self, n, days, store_dir=None, plot=False):
-        """Get the full configuration for a sumo execution.
+        Params
+        ------
+        output_path : str
+            File where output trajectories are stored.
+        pedestrians : list of Pedestrian
+            The collection of generated pedestrians.
+        """
 
-        Parameters
-        ----------
+        new_output_path = output_path.replace('.xml', '_full.xml')
+
+        # read file until first timestep entry is found
+        with open(output_path) as in_file:
+            with open(new_output_path, 'w') as out_file:
+                found = False
+                for line in in_file:
+                    if not found and '<timestep' in line:
+                        found = True
+
+                        # first step, insert all pedestrians at home at time 0
+                        out_file.write('\t<timestep time="0.00">\n')
+                        for ped in pedestrians:
+
+                            # get coords of home edge middle
+                            shape = ped.home.getShape()
+                            h_x, h_y = shape[math.trunc(len(shape)/2)]
+                            out_file.write(
+                                '\t\t<person id="ped{}_0"'.format(ped.id)
+                                + ' x="{:.2f}" y="{:.2f}"'.format(h_x, h_y)
+                                + ' angle="0.00" speed="0.00" pos="0.00"'
+                                + ' edge="{}" slope="0.00"/>\n'.format(
+                                    ped.home.getID()))
+                        out_file.write('\t</timestep>\n' + line)
+
+                    # otherwise just keep same text
+                    else:
+                        out_file.write(line)
+
+
+    def get_trajectories(self, n, days, store_dir=None, geo_format=False,
+        plot=False):
+        """Generate trips, run SUMO simulation and get trajectory data.
+
+        Params
+        ------
         n : int
             The number of pedestrians to generate.
         days : int
             Total simulation duration in days.
         store_dir : str (optional, default: None)
             The directory to store files.
+        geo_format : bool (optional, default: False - UTM)
+            Whether to store results as UTM x/y or WSG lat/lon coords.
         plot : boolean (optional, default: False)
             Whether to plot active level and trip counts.
         """
 
-        network_filename = os.path.basename(self.network)
+        network_file = os.path.basename(self.network)
 
+        # make sure store directory exists and contains network file
         if store_dir is not None:
             prefix = store_dir.rstrip("/") + "/"
             if not os.path.exists(store_dir):
                 os.mkdir(store_dir)
-            if not os.path.exists(prefix + network_filename):
-                copyfile(self.network, prefix + network_filename)
+            if not os.path.exists(prefix + network_file):
+                copyfile(self.network, prefix + network_file)
         else:
             prefix = ""
 
-        routes_filename = "{}_{}_routes.xml".format(n, days)
-        output_filename = "{}_{}_output.xml".format(n, days)
-        config_filename = "{}_{}_config.sumocfg".format(n, days)
+        # setup file names and paths
+        trips_file  = "{}_{}_trips.xml".format(n, days)
+        routes_file = "{}_{}_routes.xml".format(n, days)
+        output_file = "{}_{}_output.xml".format(n, days)
+        config_file = "{}_{}_config.sumocfg".format(n, days)
 
-        trips_path = prefix + "{}_{}_trips.xml".format(n, days)
-        routes_path = prefix + routes_filename
-        config_path = prefix + config_filename
+        trips_path = prefix + trips_file
+        routes_path = prefix + routes_file
+        output_path = prefix + output_file
 
+        # generate pedestrians
         pedestrians = self.generate_pedestrians(n)
         trips = self.generate_trips(pedestrians, days)
         self.store_trips(trips, trips_path)
         self.store_routes(trips_path, routes_path)
 
-        population = len(set([t.ped_id for t in trips]))
+        # config and run SUMO
+        print("Running SUMO")
+        sumo = SUMO(network_file, routes_file, output_file, config_file,
+            directory=store_dir, geo_format=geo_format, seed=self.seed,
+            timestep=self.timestep_length)
+        sumo.run()
 
-        config_xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<configuration'
-            + ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'
-            + ' xsi:noNamespaceSchemaLocation='
-            + '"http://sumo.dlr.de/xsd/sumo-gui.exeConfiguration.xsd">\n\n')
-
-        config_xml += ('<input isolated="{}">\n\t<net-file value="{}"/>\n'
-            .format(n - population, network_filename))
-        config_xml += ('\t<route-files value="{}"/>\n</input>\n\n'
-            .format(routes_filename))
-
-        config_xml += ('<time>\n\t<step-length value="{}"/>\n</time>\n\n'
-            .format(self.timestep_length))
-
-        config_xml += ('<output>\n\t<fcd-output value="{}"/>\n</output>\n\n'
-            .format(output_filename))
-        config_xml += ('<processing>\n\t<ignore-route-errors value="true"/>'
-            +'\n\t<pedestrian.model value="nonInteracting"/>\n'
-            +'</processing>\n\n')
-
-        if self.seed is not None:
-            config_xml += ('<random>\n\t<seed value="{}"/>\n</random>\n\n'
-                .format(self.seed))
-
-        config_xml += '</configuration>'
-
-        # write config file
-        with open(config_path, "w") as file:
-            file.write(config_xml)
-
+        print("Inserting initial pedestrian position data...")
+        self.add_homes(output_path, pedestrians)
 
         if plot:
             ActivityPlot.plot_levels(pedestrians, store_dir)
@@ -570,5 +594,4 @@ class DemandGenerator():
             ActivityPlot.plot_activity(pedestrians, trips, days, store_dir)
             ActivityPlot.plot_trip_distribution(pedestrians, trips, days, store_dir)
 
-        # return the path of the output file
-        return config_filename, prefix + output_filename
+        return output_path
