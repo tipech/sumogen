@@ -11,7 +11,6 @@ if 'SUMO_HOME' in os.environ:
     tools = os.path.join(os.environ['SUMO_HOME'], 'tools')
     if tools not in sys.path:
         sys.path.append(tools)
-        print("set up sumolib env")
 else:
     sys.exit("Please declare environment variable 'SUMO_HOME'.")
 
@@ -531,6 +530,8 @@ class DemandGenerator():
                     else:
                         out_file.write(line)
 
+        return new_output_path
+
 
     def get_trajectories(self, n, days, store_dir=None, geo_format=False,
         plot=False):
@@ -586,7 +587,7 @@ class DemandGenerator():
         sumo.run()
 
         print("Inserting initial pedestrian position data...")
-        self.add_homes(output_path, pedestrians)
+        new_output_path = self.add_homes(output_path, pedestrians)
 
         if plot:
             ActivityPlot.plot_levels(pedestrians, store_dir)
@@ -594,4 +595,4 @@ class DemandGenerator():
             ActivityPlot.plot_activity(pedestrians, trips, days, store_dir)
             ActivityPlot.plot_trip_distribution(pedestrians, trips, days, store_dir)
 
-        return output_path
+        return new_output_path
