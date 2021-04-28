@@ -57,7 +57,7 @@ class OSMNet():
         Params
         ------
         north, south, west, east : float
-            Coordinates of input bounding box
+            Geo coordinates of input area bounding box
         osm_file : str
             Output OSM network file name/path
         """
