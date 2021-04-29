@@ -455,8 +455,13 @@ class DemandGenerator():
         """Write generated routes to xml file."""
 
         print("Generating routes file.")
-        router = subprocess.run([duarouter, "-W","-n " + self.network,
-                    "--repair", "-r " + trips_path, "-o " + routes_path])
+        try:
+            router = subprocess.run([duarouter, "-W","-n " + self.network,
+                "--repair", "-r " + trips_path, "-o " + routes_path])
+        except FileNotFoundError:
+            router = subprocess.run([duarouter + '.exe', "-W",
+                "-n " + self.network, "--repair", "-r " + trips_path,
+                "-o " + routes_path])
 
         # duarouter sometimes messes up the trip depart times, read and fix it
         with open(trips_path, "r") as file:
@@ -501,7 +506,7 @@ class DemandGenerator():
             The collection of generated pedestrians.
         """
 
-        new_output_path = output_path.replace('.xml', '_full.xml')
+        new_output_path = output_path.replace('.xml', '_with_initial.xml')
 
         # read file until first timestep entry is found
         with open(output_path) as in_file:
@@ -518,9 +523,10 @@ class DemandGenerator():
                             # get coords of home edge middle
                             shape = ped.home.getShape()
                             h_x, h_y = shape[math.trunc(len(shape)/2)]
+                            h_lon, h_lat = self.net.convertXY2LonLat(h_x, h_y)
                             out_file.write(
                                 '\t\t<person id="ped{}_0"'.format(ped.id)
-                                + ' x="{:.2f}" y="{:.2f}"'.format(h_x, h_y)
+                                + ' x="{}" y="{}"'.format(h_lon,h_lat)
                                 + ' angle="0.00" speed="0.00" pos="0.00"'
                                 + ' edge="{}" slope="0.00"/>\n'.format(
                                     ped.home.getID()))

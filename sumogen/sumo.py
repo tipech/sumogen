@@ -86,4 +86,10 @@ class SUMO():
     def run(self):
         """Run the simulation"""
 
-        return subprocess.run(["sumo", self.config_file], cwd=self.directory)
+        try:
+            return subprocess.run(["sumo", self.config_file],
+                cwd=self.directory)
+        except FileNotFoundError:
+            return subprocess.run(["sumo.exe", self.config_file],
+                cwd=self.directory)
+        
